@@ -54,6 +54,8 @@ export const transactionSchema = z.object({
   isConfirmed: z.boolean(),
   notes: optionalTextSchema,
   createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  deletedAt: z.string().datetime().optional(),
 });
 export type Transaction = z.infer<typeof transactionSchema>;
 
@@ -69,6 +71,22 @@ export const saveTransactionInputSchema = transactionSchema
   })
   .strict();
 export type SaveTransactionInput = z.input<typeof saveTransactionInputSchema>;
+
+export const updateTransactionInputSchema = saveTransactionInputSchema.extend({
+  id: z.string().uuid(),
+});
+export type UpdateTransactionInput = z.input<typeof updateTransactionInputSchema>;
+
+const transactionRevisionValueSchema = saveTransactionInputSchema;
+export const transactionRevisionSchema = z.object({
+  id: z.string().uuid(),
+  transactionId: z.string().uuid(),
+  before: transactionRevisionValueSchema,
+  after: transactionRevisionValueSchema,
+  changedAt: z.string().datetime(),
+});
+export type TransactionRevision = z.infer<typeof transactionRevisionSchema>;
+export const transactionIdSchema = z.string().uuid();
 
 export const initialBalanceSchema = z.object({
   amountCents: moneyInCentsSchema,
@@ -94,7 +112,12 @@ export const financeIpcChannels = {
   getInstitutions: "finance:get-institutions",
   saveInstitution: "finance:save-institution",
   getTransactions: "finance:get-transactions",
+  getDeletedTransactions: "finance:get-deleted-transactions",
   saveTransaction: "finance:save-transaction",
+  updateTransaction: "finance:update-transaction",
+  getTransactionRevisions: "finance:get-transaction-revisions",
+  deleteTransaction: "finance:delete-transaction",
+  restoreTransaction: "finance:restore-transaction",
   setInitialBalance: "finance:set-initial-balance",
 } as const;
 
@@ -105,6 +128,11 @@ export interface FinanceApi {
   getInstitutions(): Promise<FinancialInstitution[]>;
   saveInstitution(input: SaveInstitutionInput): Promise<FinancialInstitution>;
   getTransactions(): Promise<Transaction[]>;
+  getDeletedTransactions(): Promise<Transaction[]>;
   saveTransaction(input: SaveTransactionInput): Promise<Transaction>;
+  updateTransaction(input: UpdateTransactionInput): Promise<Transaction>;
+  getTransactionRevisions(transactionId: string): Promise<TransactionRevision[]>;
+  deleteTransaction(transactionId: string): Promise<void>;
+  restoreTransaction(transactionId: string): Promise<Transaction>;
   setInitialBalance(input: InitialBalanceInput): Promise<FinanceSummary>;
 }

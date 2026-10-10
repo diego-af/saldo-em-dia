@@ -5,6 +5,7 @@ import {
   financeSummarySchema,
   financialCategorySchema,
   financialInstitutionSchema,
+  transactionRevisionSchema,
   transactionSchema,
 } from "../shared/contracts/finance";
 import {
@@ -41,8 +42,24 @@ const finance: FinanceApi = {
     ),
   getTransactions: async () =>
     transactionSchema.array().parse(await ipcRenderer.invoke(financeIpcChannels.getTransactions)),
+  getDeletedTransactions: async () =>
+    transactionSchema
+      .array()
+      .parse(await ipcRenderer.invoke(financeIpcChannels.getDeletedTransactions)),
   saveTransaction: async (input) =>
     transactionSchema.parse(await ipcRenderer.invoke(financeIpcChannels.saveTransaction, input)),
+  updateTransaction: async (input) =>
+    transactionSchema.parse(await ipcRenderer.invoke(financeIpcChannels.updateTransaction, input)),
+  getTransactionRevisions: async (transactionId) =>
+    transactionRevisionSchema
+      .array()
+      .parse(await ipcRenderer.invoke(financeIpcChannels.getTransactionRevisions, transactionId)),
+  deleteTransaction: async (transactionId) =>
+    ipcRenderer.invoke(financeIpcChannels.deleteTransaction, transactionId),
+  restoreTransaction: async (transactionId) =>
+    transactionSchema.parse(
+      await ipcRenderer.invoke(financeIpcChannels.restoreTransaction, transactionId),
+    ),
   setInitialBalance: async (input) =>
     financeSummarySchema.parse(
       await ipcRenderer.invoke(financeIpcChannels.setInitialBalance, input),

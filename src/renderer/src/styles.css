@@ -70,8 +70,9 @@ button {
   inset: 0 auto 0 0;
   width: 244px;
   padding: 28px 18px;
-  background: var(--accent-strong);
-  color: #f8f5ed;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
   display: flex;
   flex-direction: column;
 }
@@ -86,8 +87,10 @@ button {
   place-items: center;
   width: 38px;
   height: 38px;
-  border: 1px solid rgb(255 255 255 / 30%);
+  border: 1px solid var(--accent);
   border-radius: 13px;
+  color: #fff;
+  background: var(--accent);
   font:
     600 22px Georgia,
     serif;
@@ -103,7 +106,7 @@ button {
 }
 .brand small {
   margin-top: 3px;
-  color: rgb(255 255 255 / 64%);
+  color: var(--muted);
   font-size: 11px;
 }
 nav {
@@ -118,7 +121,7 @@ nav {
   padding: 11px 13px;
   border: 0;
   border-radius: 10px;
-  color: rgb(255 255 255 / 70%);
+  color: var(--muted);
   background: transparent;
   cursor: pointer;
   text-align: left;
@@ -126,12 +129,12 @@ nav {
 .nav-item:hover,
 .nav-item:focus-visible,
 .nav-item.active {
-  color: white;
-  background: rgb(255 255 255 / 11%);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
   outline: none;
 }
 .nav-item:focus-visible {
-  box-shadow: 0 0 0 2px #fff inset;
+  box-shadow: 0 0 0 2px var(--accent) inset;
 }
 .nav-item span {
   width: 22px;
@@ -141,8 +144,8 @@ nav {
 .sidebar-note {
   margin-top: auto;
   padding: 15px 12px 0;
-  border-top: 1px solid rgb(255 255 255 / 14%);
-  color: rgb(255 255 255 / 58%);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
   font-size: 11px;
   line-height: 1.5;
 }
@@ -152,7 +155,7 @@ nav {
   height: 7px;
   margin-right: 7px;
   border-radius: 99px;
-  background: #acd0b8;
+  background: var(--accent);
 }
 main {
   grid-column: 2;
@@ -496,6 +499,17 @@ textarea:focus-visible {
 }
 .table-wrap {
   overflow-x: auto;
+}
+.compact-heading {
+  margin-top: 32px;
+}
+.revision-list {
+  min-width: 230px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: left;
 }
 table {
   width: 100%;

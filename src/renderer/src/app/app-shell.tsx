@@ -4,6 +4,7 @@ import type {
   FinancialCategory,
   FinancialInstitution,
   Transaction,
+  TransactionRevision,
 } from "../../../shared/contracts/finance";
 import { financeSummarySchema } from "../../../shared/contracts/finance";
 import { formatBrl } from "../features/transactions/brl-money";
@@ -34,21 +35,27 @@ export function AppShell() {
   const [categories, setCategories] = useState<FinancialCategory[]>([]);
   const [institutions, setInstitutions] = useState<FinancialInstitution[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [deletedTransactions, setDeletedTransactions] = useState<Transaction[]>([]);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction>();
+  const [revisions, setRevisions] = useState<Record<string, TransactionRevision[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const refresh = useCallback(async () => {
     try {
-      const [nextSummary, nextCategories, nextInstitutions, nextTransactions] = await Promise.all([
-        window.saldoEmDia.finance.getSummary(),
-        window.saldoEmDia.finance.getCategories(),
-        window.saldoEmDia.finance.getInstitutions(),
-        window.saldoEmDia.finance.getTransactions(),
-      ]);
+      const [nextSummary, nextCategories, nextInstitutions, nextTransactions, nextDeleted] =
+        await Promise.all([
+          window.saldoEmDia.finance.getSummary(),
+          window.saldoEmDia.finance.getCategories(),
+          window.saldoEmDia.finance.getInstitutions(),
+          window.saldoEmDia.finance.getTransactions(),
+          window.saldoEmDia.finance.getDeletedTransactions(),
+        ]);
       setSummary(nextSummary);
       setCategories(nextCategories);
       setInstitutions(nextInstitutions);
       setTransactions(nextTransactions);
+      setDeletedTransactions(nextDeleted);
       setError("");
     } catch {
       setError("Não foi possível carregar seus dados. Feche e abra o aplicativo novamente.");
@@ -62,10 +69,12 @@ export function AppShell() {
   }, [refresh]);
   const openTransaction = () => {
     setSection("Lançamentos");
+    setEditingTransaction(undefined);
     setShowTransaction(true);
   };
   const savedTransaction = async () => {
     await refresh();
+    setEditingTransaction(undefined);
     setShowTransaction(false);
   };
 
@@ -124,13 +133,37 @@ export function AppShell() {
             <TransactionForm
               categories={categories}
               institutions={institutions}
+              transaction={editingTransaction}
               onCancel={() => setShowTransaction(false)}
               onSaved={savedTransaction}
             />
           ) : section === "Visão geral" ? (
             <Overview summary={summary} onConfigure={() => setSection("Configurações")} />
           ) : section === "Lançamentos" ? (
-            <Transactions transactions={transactions} categories={categories} />
+            <Transactions
+              transactions={transactions}
+              deletedTransactions={deletedTransactions}
+              categories={categories}
+              revisions={revisions}
+              onEdit={(transaction) => {
+                setEditingTransaction(transaction);
+                setShowTransaction(true);
+              }}
+              onDelete={async (transaction) => {
+                await window.saldoEmDia.finance.deleteTransaction(transaction.id);
+                await refresh();
+              }}
+              onRestore={async (transaction) => {
+                await window.saldoEmDia.finance.restoreTransaction(transaction.id);
+                await refresh();
+              }}
+              onHistory={async (transaction) => {
+                const history = await window.saldoEmDia.finance.getTransactionRevisions(
+                  transaction.id,
+                );
+                setRevisions((current) => ({ ...current, [transaction.id]: history }));
+              }}
+            />
           ) : section === "Configurações" ? (
             <SettingsPage
               summary={summary}
@@ -230,10 +263,22 @@ function Summary({
 }
 function Transactions({
   transactions,
+  deletedTransactions,
   categories,
+  revisions,
+  onEdit,
+  onDelete,
+  onRestore,
+  onHistory,
 }: {
   transactions: Transaction[];
+  deletedTransactions: Transaction[];
   categories: FinancialCategory[];
+  revisions: Record<string, TransactionRevision[]>;
+  onEdit(transaction: Transaction): void;
+  onDelete(transaction: Transaction): Promise<void>;
+  onRestore(transaction: Transaction): Promise<void>;
+  onHistory(transaction: Transaction): Promise<void>;
 }) {
   const names = new Map(categories.map((item) => [item.id, item.name]));
   return (
@@ -257,6 +302,7 @@ function Transactions({
                 <th>Categoria</th>
                 <th>Situação</th>
                 <th>Valor</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -267,11 +313,74 @@ function Transactions({
                   <td>{names.get(item.categoryId)}</td>
                   <td>{item.isConfirmed ? "Confirmado" : "Previsto"}</td>
                   <td>{formatBrl(item.amountCents)}</td>
+                  <td>
+                    <span className="row-actions">
+                      <button className="text-action" type="button" onClick={() => onEdit(item)}>
+                        Corrigir
+                      </button>
+                      <button
+                        className="text-action"
+                        type="button"
+                        onClick={() => void onDelete(item)}
+                      >
+                        Excluir
+                      </button>
+                      <button
+                        className="text-action"
+                        type="button"
+                        onClick={() => void onHistory(item)}
+                      >
+                        Histórico
+                      </button>
+                    </span>
+                    {revisions[item.id] && (
+                      <ul className="revision-list">
+                        {revisions[item.id].length === 0 ? (
+                          <li>Sem correções.</li>
+                        ) : (
+                          revisions[item.id].map((revision) => (
+                            <li key={revision.id}>
+                              {new Date(revision.changedAt).toLocaleString("pt-BR")}: valor de{" "}
+                              {formatBrl(revision.before.amountCents)} para{" "}
+                              {formatBrl(revision.after.amountCents)}
+                            </li>
+                          ))
+                        )}
+                      </ul>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+      <div className="section-heading compact-heading">
+        <div>
+          <p className="eyebrow">Exclusão temporária</p>
+          <h2>Lixeira</h2>
+        </div>
+        <span className="privacy-badge">{deletedTransactions.length} itens</span>
+      </div>
+      {deletedTransactions.length === 0 ? (
+        <p className="supporting-text">A lixeira está vazia.</p>
+      ) : (
+        <ul className="catalog-list">
+          {deletedTransactions.map((item) => (
+            <li key={item.id}>
+              <span>
+                <strong>{item.description || names.get(item.categoryId) || "Lançamento"}</strong>
+                <small>
+                  {formatBrl(item.amountCents)} · removido em{" "}
+                  {item.deletedAt ? new Date(item.deletedAt).toLocaleDateString("pt-BR") : ""}
+                </small>
+              </span>
+              <button className="text-action" type="button" onClick={() => void onRestore(item)}>
+                Restaurar
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   );

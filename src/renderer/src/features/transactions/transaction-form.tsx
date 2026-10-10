@@ -1,10 +1,15 @@
 import { type FormEvent, useState } from "react";
-import type { FinancialCategory, FinancialInstitution } from "../../../../shared/contracts/finance";
-import { parseBrl } from "./brl-money";
+import type {
+  FinancialCategory,
+  FinancialInstitution,
+  Transaction,
+} from "../../../../shared/contracts/finance";
+import { formatBrl, parseBrl } from "./brl-money";
 
 interface TransactionFormProps {
   categories: FinancialCategory[];
   institutions: FinancialInstitution[];
+  transaction?: Transaction;
   onCancel(): void;
   onSaved(): Promise<void>;
 }
@@ -12,12 +17,17 @@ interface TransactionFormProps {
 export function TransactionForm({
   categories,
   institutions,
+  transaction,
   onCancel,
   onSaved,
 }: TransactionFormProps) {
   const [error, setError] = useState("");
-  const activeCategories = categories.filter(({ active }) => active);
-  const activeInstitutions = institutions.filter(({ active }) => active);
+  const activeCategories = categories.filter(
+    ({ id, active }) => active || id === transaction?.categoryId,
+  );
+  const activeInstitutions = institutions.filter(
+    ({ id, active }) => active || id === transaction?.institutionId,
+  );
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -30,7 +40,7 @@ export function TransactionForm({
     }
 
     try {
-      await window.saldoEmDia.finance.saveTransaction({
+      const input = {
         description: String(data.get("description") ?? "").trim() || undefined,
         amountCents,
         categoryId: String(data.get("categoryId")),
@@ -38,7 +48,12 @@ export function TransactionForm({
         date: String(data.get("date")),
         isConfirmed: data.get("status") === "confirmed",
         notes: String(data.get("notes") ?? "").trim() || undefined,
-      });
+      };
+      if (transaction) {
+        await window.saldoEmDia.finance.updateTransaction({ id: transaction.id, ...input });
+      } else {
+        await window.saldoEmDia.finance.saveTransaction(input);
+      }
       await onSaved();
     } catch {
       setError("Não foi possível salvar o lançamento. Confira os dados e tente novamente.");
@@ -50,12 +65,18 @@ export function TransactionForm({
       <div className="panel-heading">
         <div>
           <p className="eyebrow">Lançamento manual</p>
-          <h2 id="transaction-title">Novo lançamento</h2>
+          <h2 id="transaction-title">{transaction ? "Corrigir lançamento" : "Novo lançamento"}</h2>
         </div>
         <button className="text-action" type="button" onClick={onCancel}>
           Cancelar
         </button>
       </div>
+      {transaction?.isConfirmed && (
+        <p className="notice" role="status">
+          Esta correção recalculará saldos, projeções e relatórios. A versão anterior ficará no
+          histórico.
+        </p>
+      )}
       {activeCategories.length === 0 ? (
         <p className="notice" role="status">
           Crie uma categoria ativa em Configurações antes de lançar.
@@ -70,15 +91,21 @@ export function TransactionForm({
           <div className="form-grid">
             <label>
               Valor em reais
-              <input name="amount" inputMode="decimal" placeholder="0,00" required />
+              <input
+                name="amount"
+                inputMode="decimal"
+                placeholder="0,00"
+                defaultValue={transaction ? formatBrl(transaction.amountCents) : undefined}
+                required
+              />
             </label>
             <label>
               Data
-              <input name="date" type="date" required />
+              <input name="date" type="date" defaultValue={transaction?.date} required />
             </label>
             <label>
               Categoria
-              <select name="categoryId" required defaultValue="">
+              <select name="categoryId" required defaultValue={transaction?.categoryId ?? ""}>
                 <option value="" disabled>
                   Selecione
                 </option>
@@ -91,7 +118,7 @@ export function TransactionForm({
             </label>
             <label>
               Instituição (opcional)
-              <select name="institutionId" defaultValue="">
+              <select name="institutionId" defaultValue={transaction?.institutionId ?? ""}>
                 <option value="">Sem instituição</option>
                 {activeInstitutions.map((institution) => (
                   <option key={institution.id} value={institution.id}>
@@ -102,22 +129,25 @@ export function TransactionForm({
             </label>
             <label>
               Descrição (opcional)
-              <input name="description" maxLength={500} />
+              <input name="description" maxLength={500} defaultValue={transaction?.description} />
             </label>
             <label>
               Situação
-              <select name="status" defaultValue="confirmed">
+              <select
+                name="status"
+                defaultValue={transaction?.isConfirmed === false ? "planned" : "confirmed"}
+              >
                 <option value="confirmed">Confirmado</option>
                 <option value="planned">Previsto</option>
               </select>
             </label>
             <label className="full-field">
               Observação (opcional)
-              <textarea name="notes" maxLength={500} rows={3} />
+              <textarea name="notes" maxLength={500} rows={3} defaultValue={transaction?.notes} />
             </label>
           </div>
           <button className="primary-action" type="submit">
-            Salvar lançamento
+            {transaction ? "Salvar correção" : "Salvar lançamento"}
           </button>
         </form>
       )}
