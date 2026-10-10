@@ -407,6 +407,10 @@ h2 {
 .settings-grid {
   align-items: start;
 }
+.card-page {
+  display: grid;
+  gap: 18px;
+}
 .settings-grid .panel:first-child {
   grid-column: 1 / -1;
 }

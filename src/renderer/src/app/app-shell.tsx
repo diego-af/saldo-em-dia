@@ -7,6 +7,7 @@ import type {
   TransactionRevision,
 } from "../../../shared/contracts/finance";
 import { financeSummarySchema } from "../../../shared/contracts/finance";
+import { CreditCardPage } from "../features/credit-cards/credit-card-page";
 import { formatBrl } from "../features/transactions/brl-money";
 import { SettingsPage } from "../features/transactions/settings-page";
 import { TransactionForm } from "../features/transactions/transaction-form";
@@ -163,6 +164,12 @@ export function AppShell() {
                 );
                 setRevisions((current) => ({ ...current, [transaction.id]: history }));
               }}
+            />
+          ) : section === "Cartão" ? (
+            <CreditCardPage
+              categories={categories}
+              institutions={institutions}
+              onChanged={refresh}
             />
           ) : section === "Configurações" ? (
             <SettingsPage

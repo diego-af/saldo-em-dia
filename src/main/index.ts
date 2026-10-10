@@ -1,8 +1,10 @@
 import { join } from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
+import { createCreditCardRepository } from "./database/credit-card-repository";
 import { createDatabaseClient } from "./database/database-client";
 import { createFinanceRepository } from "./database/finance-repository";
 import { createPreferencesRepository } from "./database/preferences-repository";
+import { registerCreditCardIpc } from "./ipc/credit-card-ipc";
 import { registerFinanceIpc } from "./ipc/finance-ipc";
 import { registerPreferencesIpc } from "./ipc/preferences-ipc";
 import { createLocalLogger } from "./observability/local-logger";
@@ -44,8 +46,10 @@ void app.whenReady().then(async () => {
   const dbClient = await createDatabaseClient(join(app.getPath("userData"), "saldo-em-dia.sqlite"));
   const preferences = createPreferencesRepository(dbClient);
   const finance = createFinanceRepository(dbClient);
+  const creditCards = createCreditCardRepository(dbClient);
   registerPreferencesIpc(ipcMain, preferences);
   registerFinanceIpc(ipcMain, finance);
+  registerCreditCardIpc(ipcMain, creditCards);
 
   process.on("uncaughtException", () => {
     logger.unexpected({

@@ -6,6 +6,9 @@ declare global {
     saldoEmDia: {
       preferences: PreferencesApi;
       finance: FinanceApi;
+      creditCards: CreditCardApi;
     };
   }
 }
+
+import type { CreditCardApi } from "../../shared/contracts/credit-card";

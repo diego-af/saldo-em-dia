@@ -5,6 +5,7 @@ import { createFinancialCoreMigration } from "./migrations/0002-create-financial
 import { addInitialBalanceMigration } from "./migrations/0003-add-initial-balance";
 import { optionalTransactionInstitutionMigration } from "./migrations/0004-optional-transaction-institution";
 import { addTransactionHistoryMigration } from "./migrations/0005-add-transaction-history";
+import { createCreditCardsMigration } from "./migrations/0006-create-credit-cards";
 
 const migrations = [
   createPreferencesMigration,
@@ -12,6 +13,7 @@ const migrations = [
   addInitialBalanceMigration,
   optionalTransactionInstitutionMigration,
   addTransactionHistoryMigration,
+  createCreditCardsMigration,
 ];
 
 export function runMigrations(database: Database, databasePath: string): void {

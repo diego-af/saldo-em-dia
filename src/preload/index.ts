@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer } from "electron";
 import {
+  type CreditCardApi,
+  cardInvoiceSchema,
+  cardPurchaseSchema,
+  cardSummarySchema,
+  creditCardIpcChannels,
+  creditCardSchema,
+} from "../shared/contracts/credit-card";
+import {
   type FinanceApi,
   financeIpcChannels,
   financeSummarySchema,
@@ -66,4 +74,24 @@ const finance: FinanceApi = {
     ),
 };
 
-contextBridge.exposeInMainWorld("saldoEmDia", { preferences, finance });
+const creditCards: CreditCardApi = {
+  getCards: async () =>
+    creditCardSchema.array().parse(await ipcRenderer.invoke(creditCardIpcChannels.getCards)),
+  saveCard: async (input) =>
+    creditCardSchema.parse(await ipcRenderer.invoke(creditCardIpcChannels.saveCard, input)),
+  createPurchase: async (input) =>
+    cardPurchaseSchema.parse(await ipcRenderer.invoke(creditCardIpcChannels.createPurchase, input)),
+  getPurchases: async (cardId) =>
+    cardPurchaseSchema
+      .array()
+      .parse(await ipcRenderer.invoke(creditCardIpcChannels.getPurchases, cardId)),
+  getSummary: async (cardId) =>
+    cardSummarySchema.parse(await ipcRenderer.invoke(creditCardIpcChannels.getSummary, cardId)),
+  listInvoices: async (cardId) =>
+    cardInvoiceSchema
+      .array()
+      .parse(await ipcRenderer.invoke(creditCardIpcChannels.listInvoices, cardId)),
+  payInvoice: async (input) => ipcRenderer.invoke(creditCardIpcChannels.payInvoice, input),
+};
+
+contextBridge.exposeInMainWorld("saldoEmDia", { preferences, finance, creditCards });

@@ -372,6 +372,19 @@ export function createFinanceRepository(
       }));
       const balances = calculateBalances(initialBalance?.amountCents ?? 0, transactions);
       const month = new Date().toISOString().slice(0, 7);
+      const invoicePayments = rows(
+        client,
+        "SELECT amount_cents, payment_date FROM invoice_payments",
+      ).map(([amountCents, paymentDate]) => ({
+        amountCents: Number(amountCents),
+        paymentDate: String(paymentDate),
+      }));
+      const paidInvoicesCents = invoicePayments.reduce(
+        (total, payment) => total + payment.amountCents,
+        0,
+      );
+      balances.availableCents -= paidInvoicesCents;
+      balances.projectedCents -= paidInvoicesCents;
       const confirmedThisMonth = transactions.filter(
         ({ date, isConfirmed }) => isConfirmed && date.startsWith(month),
       );
@@ -381,9 +394,13 @@ export function createFinanceRepository(
         receivedThisMonthCents: confirmedThisMonth
           .filter(({ type }) => type === "income")
           .reduce((sum, { amountCents }) => sum + amountCents, 0),
-        paidThisMonthCents: confirmedThisMonth
-          .filter(({ type }) => type === "expense")
-          .reduce((sum, { amountCents }) => sum + amountCents, 0),
+        paidThisMonthCents:
+          confirmedThisMonth
+            .filter(({ type }) => type === "expense")
+            .reduce((sum, { amountCents }) => sum + amountCents, 0) +
+          invoicePayments
+            .filter(({ paymentDate }) => paymentDate.startsWith(month))
+            .reduce((sum, { amountCents }) => sum + amountCents, 0),
       } as FinanceSummary;
     },
   };
