@@ -8,6 +8,12 @@ import {
   creditCardSchema,
 } from "../shared/contracts/credit-card";
 import {
+  type DebtApi,
+  debtInstallmentSchema,
+  debtIpcChannels,
+  debtSchema,
+} from "../shared/contracts/debt";
+import {
   type FinanceApi,
   financeIpcChannels,
   financeSummarySchema,
@@ -21,6 +27,12 @@ import {
   preferencesIpcChannels,
   themePreferenceOutputSchema,
 } from "../shared/contracts/preferences";
+import {
+  type RecurrenceApi,
+  recurrenceIpcChannels,
+  recurrenceOccurrenceSchema,
+  recurrenceSchema,
+} from "../shared/contracts/recurrence";
 
 const preferences: PreferencesApi = {
   getTheme: async () =>
@@ -94,4 +106,36 @@ const creditCards: CreditCardApi = {
   payInvoice: async (input) => ipcRenderer.invoke(creditCardIpcChannels.payInvoice, input),
 };
 
-contextBridge.exposeInMainWorld("saldoEmDia", { preferences, finance, creditCards });
+const debts: DebtApi = {
+  create: async (input) =>
+    debtSchema.parse(await ipcRenderer.invoke(debtIpcChannels.create, input)),
+  list: async () => debtSchema.array().parse(await ipcRenderer.invoke(debtIpcChannels.list)),
+  listInstallments: async (debtId) =>
+    debtInstallmentSchema
+      .array()
+      .parse(await ipcRenderer.invoke(debtIpcChannels.listInstallments, debtId)),
+  payInstallment: async (input) => ipcRenderer.invoke(debtIpcChannels.payInstallment, input),
+};
+
+const recurrences: RecurrenceApi = {
+  create: async (input) =>
+    recurrenceSchema.parse(await ipcRenderer.invoke(recurrenceIpcChannels.create, input)),
+  list: async () =>
+    recurrenceSchema.array().parse(await ipcRenderer.invoke(recurrenceIpcChannels.list)),
+  listOccurrences: async (recurrenceId) =>
+    recurrenceOccurrenceSchema
+      .array()
+      .parse(await ipcRenderer.invoke(recurrenceIpcChannels.listOccurrences, recurrenceId)),
+  updateOccurrence: async (input) =>
+    ipcRenderer.invoke(recurrenceIpcChannels.updateOccurrence, input),
+  confirmOccurrence: async (input) =>
+    ipcRenderer.invoke(recurrenceIpcChannels.confirmOccurrence, input),
+};
+
+contextBridge.exposeInMainWorld("saldoEmDia", {
+  preferences,
+  finance,
+  creditCards,
+  debts,
+  recurrences,
+});

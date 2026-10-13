@@ -2,11 +2,15 @@ import { join } from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { createCreditCardRepository } from "./database/credit-card-repository";
 import { createDatabaseClient } from "./database/database-client";
+import { createDebtRepository } from "./database/debt-repository";
 import { createFinanceRepository } from "./database/finance-repository";
 import { createPreferencesRepository } from "./database/preferences-repository";
+import { createRecurrenceRepository } from "./database/recurrence-repository";
 import { registerCreditCardIpc } from "./ipc/credit-card-ipc";
+import { registerDebtIpc } from "./ipc/debt-ipc";
 import { registerFinanceIpc } from "./ipc/finance-ipc";
 import { registerPreferencesIpc } from "./ipc/preferences-ipc";
+import { registerRecurrenceIpc } from "./ipc/recurrence-ipc";
 import { createLocalLogger } from "./observability/local-logger";
 
 let mainWindow: BrowserWindow | undefined;
@@ -47,9 +51,13 @@ void app.whenReady().then(async () => {
   const preferences = createPreferencesRepository(dbClient);
   const finance = createFinanceRepository(dbClient);
   const creditCards = createCreditCardRepository(dbClient);
+  const debts = createDebtRepository(dbClient);
+  const recurrences = createRecurrenceRepository(dbClient);
   registerPreferencesIpc(ipcMain, preferences);
   registerFinanceIpc(ipcMain, finance);
   registerCreditCardIpc(ipcMain, creditCards);
+  registerDebtIpc(ipcMain, debts);
+  registerRecurrenceIpc(ipcMain, recurrences);
 
   process.on("uncaughtException", () => {
     logger.unexpected({

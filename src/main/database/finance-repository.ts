@@ -385,22 +385,69 @@ export function createFinanceRepository(
       );
       balances.availableCents -= paidInvoicesCents;
       balances.projectedCents -= paidInvoicesCents;
+      const debtPayments = rows(
+        client,
+        "SELECT amount_cents, payment_date FROM debt_installments WHERE payment_date IS NOT NULL",
+      ).map(([amountCents, paymentDate]) => ({
+        amountCents: Number(amountCents),
+        paymentDate: String(paymentDate),
+      }));
+      const paidDebtsCents = debtPayments.reduce(
+        (total, payment) => total + payment.amountCents,
+        0,
+      );
+      balances.availableCents -= paidDebtsCents;
+      balances.projectedCents -= paidDebtsCents;
+      const recurrenceOccurrences = rows(
+        client,
+        `SELECT o.amount_cents, o.actual_amount_cents, o.confirmation_date, c.type
+         FROM recurrence_occurrences o
+         JOIN recurrences r ON r.id = o.recurrence_id
+         JOIN financial_categories c ON c.id = r.category_id`,
+      ).map(([amountCents, actualAmountCents, confirmationDate, type]) => ({
+        amountCents: Number(amountCents),
+        actualAmountCents: actualAmountCents === null ? null : Number(actualAmountCents),
+        confirmationDate: confirmationDate === null ? null : String(confirmationDate),
+        type: type === "income" ? ("income" as const) : ("expense" as const),
+      }));
+      for (const occurrence of recurrenceOccurrences) {
+        const amount = occurrence.actualAmountCents ?? occurrence.amountCents;
+        const signedAmount = occurrence.type === "income" ? amount : -amount;
+        balances.projectedCents += signedAmount;
+        if (occurrence.confirmationDate) balances.availableCents += signedAmount;
+      }
       const confirmedThisMonth = transactions.filter(
         ({ date, isConfirmed }) => isConfirmed && date.startsWith(month),
       );
       return {
         initialBalance,
         ...balances,
-        receivedThisMonthCents: confirmedThisMonth
-          .filter(({ type }) => type === "income")
-          .reduce((sum, { amountCents }) => sum + amountCents, 0),
+        receivedThisMonthCents:
+          confirmedThisMonth
+            .filter(({ type }) => type === "income")
+            .reduce((sum, { amountCents }) => sum + amountCents, 0) +
+          recurrenceOccurrences
+            .filter(
+              ({ type, confirmationDate }) =>
+                type === "income" && confirmationDate?.startsWith(month),
+            )
+            .reduce((sum, item) => sum + (item.actualAmountCents ?? item.amountCents), 0),
         paidThisMonthCents:
           confirmedThisMonth
             .filter(({ type }) => type === "expense")
             .reduce((sum, { amountCents }) => sum + amountCents, 0) +
           invoicePayments
             .filter(({ paymentDate }) => paymentDate.startsWith(month))
-            .reduce((sum, { amountCents }) => sum + amountCents, 0),
+            .reduce((sum, { amountCents }) => sum + amountCents, 0) +
+          debtPayments
+            .filter(({ paymentDate }) => paymentDate.startsWith(month))
+            .reduce((sum, { amountCents }) => sum + amountCents, 0) +
+          recurrenceOccurrences
+            .filter(
+              ({ type, confirmationDate }) =>
+                type === "expense" && confirmationDate?.startsWith(month),
+            )
+            .reduce((sum, item) => sum + (item.actualAmountCents ?? item.amountCents), 0),
       } as FinanceSummary;
     },
   };

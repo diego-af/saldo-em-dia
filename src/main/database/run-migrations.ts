@@ -6,6 +6,8 @@ import { addInitialBalanceMigration } from "./migrations/0003-add-initial-balanc
 import { optionalTransactionInstitutionMigration } from "./migrations/0004-optional-transaction-institution";
 import { addTransactionHistoryMigration } from "./migrations/0005-add-transaction-history";
 import { createCreditCardsMigration } from "./migrations/0006-create-credit-cards";
+import { createDebtsMigration } from "./migrations/0007-create-debts";
+import { createRecurrencesMigration } from "./migrations/0008-create-recurrences";
 
 const migrations = [
   createPreferencesMigration,
@@ -14,6 +16,8 @@ const migrations = [
   optionalTransactionInstitutionMigration,
   addTransactionHistoryMigration,
   createCreditCardsMigration,
+  createDebtsMigration,
+  createRecurrencesMigration,
 ];
 
 export function runMigrations(database: Database, databasePath: string): void {

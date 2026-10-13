@@ -8,6 +8,8 @@ import type {
 } from "../../../shared/contracts/finance";
 import { financeSummarySchema } from "../../../shared/contracts/finance";
 import { CreditCardPage } from "../features/credit-cards/credit-card-page";
+import { DebtPage } from "../features/debts/debt-page";
+import { RecurrencePanel } from "../features/recurrences/recurrence-panel";
 import { formatBrl } from "../features/transactions/brl-money";
 import { SettingsPage } from "../features/transactions/settings-page";
 import { TransactionForm } from "../features/transactions/transaction-form";
@@ -141,36 +143,41 @@ export function AppShell() {
           ) : section === "Visão geral" ? (
             <Overview summary={summary} onConfigure={() => setSection("Configurações")} />
           ) : section === "Lançamentos" ? (
-            <Transactions
-              transactions={transactions}
-              deletedTransactions={deletedTransactions}
-              categories={categories}
-              revisions={revisions}
-              onEdit={(transaction) => {
-                setEditingTransaction(transaction);
-                setShowTransaction(true);
-              }}
-              onDelete={async (transaction) => {
-                await window.saldoEmDia.finance.deleteTransaction(transaction.id);
-                await refresh();
-              }}
-              onRestore={async (transaction) => {
-                await window.saldoEmDia.finance.restoreTransaction(transaction.id);
-                await refresh();
-              }}
-              onHistory={async (transaction) => {
-                const history = await window.saldoEmDia.finance.getTransactionRevisions(
-                  transaction.id,
-                );
-                setRevisions((current) => ({ ...current, [transaction.id]: history }));
-              }}
-            />
+            <>
+              <Transactions
+                transactions={transactions}
+                deletedTransactions={deletedTransactions}
+                categories={categories}
+                revisions={revisions}
+                onEdit={(transaction) => {
+                  setEditingTransaction(transaction);
+                  setShowTransaction(true);
+                }}
+                onDelete={async (transaction) => {
+                  await window.saldoEmDia.finance.deleteTransaction(transaction.id);
+                  await refresh();
+                }}
+                onRestore={async (transaction) => {
+                  await window.saldoEmDia.finance.restoreTransaction(transaction.id);
+                  await refresh();
+                }}
+                onHistory={async (transaction) => {
+                  const history = await window.saldoEmDia.finance.getTransactionRevisions(
+                    transaction.id,
+                  );
+                  setRevisions((current) => ({ ...current, [transaction.id]: history }));
+                }}
+              />
+              <RecurrencePanel categories={categories} onChanged={refresh} />
+            </>
           ) : section === "Cartão" ? (
             <CreditCardPage
               categories={categories}
               institutions={institutions}
               onChanged={refresh}
             />
+          ) : section === "Dívidas" ? (
+            <DebtPage onChanged={refresh} />
           ) : section === "Configurações" ? (
             <SettingsPage
               summary={summary}
