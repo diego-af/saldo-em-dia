@@ -17,11 +17,15 @@ export function RecurrencePanel({ categories, onChanged }: RecurrencePanelProps)
   const [recurrences, setRecurrences] = useState<Recurrence[]>([]);
   const [occurrences, setOccurrences] = useState<Record<string, RecurrenceOccurrence[]>>({});
   const [drafts, setDrafts] = useState<Record<string, OccurrenceDraft>>({});
+  const [silenced, setSilenced] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
   const activeCategories = categories.filter(({ active }) => active);
 
   const load = useCallback(async () => {
-    const nextRecurrences = await window.saldoEmDia.recurrences.list();
+    const [nextRecurrences, silencedKeys] = await Promise.all([
+      window.saldoEmDia.recurrences.list(),
+      window.saldoEmDia.reminders.listSilenced(),
+    ]);
     const entries = await Promise.all(
       nextRecurrences.map(
         async (recurrence) =>
@@ -33,6 +37,7 @@ export function RecurrencePanel({ categories, onChanged }: RecurrencePanelProps)
     );
     const nextOccurrences = Object.fromEntries(entries);
     setRecurrences(nextRecurrences);
+    setSilenced(new Set(silencedKeys));
     setOccurrences(nextOccurrences);
     setDrafts(
       Object.fromEntries(
@@ -113,6 +118,16 @@ export function RecurrencePanel({ categories, onChanged }: RecurrencePanelProps)
       await onChanged();
     } catch {
       setError("Não foi possível confirmar a ocorrência.");
+    }
+  }
+
+  async function silence(item: RecurrenceOccurrence) {
+    const key = `recurrence-occurrence:${item.id}`;
+    try {
+      await window.saldoEmDia.reminders.silence(key);
+      setSilenced((current) => new Set(current).add(key));
+    } catch {
+      setError("Não foi possível silenciar os avisos.");
     }
   }
 
@@ -214,6 +229,16 @@ export function RecurrencePanel({ categories, onChanged }: RecurrencePanelProps)
                       onClick={() => void update(item, "future")}
                     >
                       Esta e futuras
+                    </button>
+                    <button
+                      className="text-action"
+                      type="button"
+                      disabled={silenced.has(`recurrence-occurrence:${item.id}`)}
+                      onClick={() => void silence(item)}
+                    >
+                      {silenced.has(`recurrence-occurrence:${item.id}`)
+                        ? "Avisos silenciados"
+                        : "Silenciar avisos"}
                     </button>
                     <button
                       className="secondary-action"

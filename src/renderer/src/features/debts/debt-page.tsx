@@ -14,16 +14,21 @@ export function DebtPage({ onChanged }: DebtPageProps) {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [installments, setInstallments] = useState<Record<string, DebtInstallment[]>>({});
   const [plan, setPlan] = useState<PlannedDebtInstallment[]>([]);
+  const [silenced, setSilenced] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    const nextDebts = await window.saldoEmDia.debts.list();
+    const [nextDebts, silencedKeys] = await Promise.all([
+      window.saldoEmDia.debts.list(),
+      window.saldoEmDia.reminders.listSilenced(),
+    ]);
     const entries = await Promise.all(
       nextDebts.map(
         async (debt) => [debt.id, await window.saldoEmDia.debts.listInstallments(debt.id)] as const,
       ),
     );
     setDebts(nextDebts);
+    setSilenced(new Set(silencedKeys));
     setInstallments(Object.fromEntries(entries));
   }, []);
 
@@ -82,6 +87,16 @@ export function DebtPage({ onChanged }: DebtPageProps) {
       await onChanged();
     } catch {
       setError("Não foi possível registrar o pagamento.");
+    }
+  }
+
+  async function silence(installment: DebtInstallment) {
+    const key = `debt-installment:${installment.id}`;
+    try {
+      await window.saldoEmDia.reminders.silence(key);
+      setSilenced((current) => new Set(current).add(key));
+    } catch {
+      setError("Não foi possível silenciar os avisos.");
     }
   }
 
@@ -202,13 +217,25 @@ export function DebtPage({ onChanged }: DebtPageProps) {
                         </small>
                       </span>
                       {item.status !== "paid" && (
-                        <button
-                          className="secondary-action"
-                          type="button"
-                          onClick={() => void pay(item)}
-                        >
-                          Registrar pagamento
-                        </button>
+                        <span className="row-actions">
+                          <button
+                            className="text-action"
+                            type="button"
+                            disabled={silenced.has(`debt-installment:${item.id}`)}
+                            onClick={() => void silence(item)}
+                          >
+                            {silenced.has(`debt-installment:${item.id}`)
+                              ? "Avisos silenciados"
+                              : "Silenciar avisos"}
+                          </button>
+                          <button
+                            className="secondary-action"
+                            type="button"
+                            onClick={() => void pay(item)}
+                          >
+                            Registrar pagamento
+                          </button>
+                        </span>
                       )}
                     </li>
                   ))}

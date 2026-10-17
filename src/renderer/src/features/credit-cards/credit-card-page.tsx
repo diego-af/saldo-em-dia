@@ -19,13 +19,18 @@ export function CreditCardPage({ categories, institutions, onChanged }: CreditCa
   const [summary, setSummary] = useState<CardSummary>();
   const [invoices, setInvoices] = useState<CardInvoice[]>([]);
   const [purchases, setPurchases] = useState<CardPurchase[]>([]);
+  const [silenced, setSilenced] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
   const activeInstitutions = institutions.filter(({ active }) => active);
   const expenseCategories = categories.filter(({ active, type }) => active && type === "expense");
 
   const load = useCallback(async () => {
-    const nextCards = await window.saldoEmDia.creditCards.getCards();
+    const [nextCards, silencedKeys] = await Promise.all([
+      window.saldoEmDia.creditCards.getCards(),
+      window.saldoEmDia.reminders.listSilenced(),
+    ]);
     setCards(nextCards);
+    setSilenced(new Set(silencedKeys));
     const card = nextCards[0];
     if (!card) return;
     const [nextSummary, nextInvoices, nextPurchases] = await Promise.all([
@@ -98,6 +103,16 @@ export function CreditCardPage({ categories, institutions, onChanged }: CreditCa
       await onChanged();
     } catch {
       setError("Não foi possível pagar a fatura.");
+    }
+  }
+
+  async function silence(invoice: CardInvoice) {
+    const key = `invoice:${invoice.cardId}:${invoice.month}`;
+    try {
+      await window.saldoEmDia.reminders.silence(key);
+      setSilenced((current) => new Set(current).add(key));
+    } catch {
+      setError("Não foi possível silenciar os avisos.");
     }
   }
 
@@ -232,13 +247,25 @@ export function CreditCardPage({ categories, institutions, onChanged }: CreditCa
                   </small>
                 </span>
                 {!invoice.paidAt && (
-                  <button
-                    className="secondary-action"
-                    type="button"
-                    onClick={() => void pay(invoice)}
-                  >
-                    Pagar integralmente
-                  </button>
+                  <span className="row-actions">
+                    <button
+                      className="text-action"
+                      type="button"
+                      disabled={silenced.has(`invoice:${invoice.cardId}:${invoice.month}`)}
+                      onClick={() => void silence(invoice)}
+                    >
+                      {silenced.has(`invoice:${invoice.cardId}:${invoice.month}`)
+                        ? "Avisos silenciados"
+                        : "Silenciar avisos"}
+                    </button>
+                    <button
+                      className="secondary-action"
+                      type="button"
+                      onClick={() => void pay(invoice)}
+                    >
+                      Pagar integralmente
+                    </button>
+                  </span>
                 )}
               </li>
             ))}

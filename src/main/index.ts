@@ -1,19 +1,23 @@
 import { join } from "node:path";
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, Notification } from "electron";
 import { createCreditCardRepository } from "./database/credit-card-repository";
 import { createDatabaseClient } from "./database/database-client";
 import { createDebtRepository } from "./database/debt-repository";
 import { createFinanceRepository } from "./database/finance-repository";
 import { createPreferencesRepository } from "./database/preferences-repository";
 import { createRecurrenceRepository } from "./database/recurrence-repository";
+import { createReminderRepository } from "./database/reminder-repository";
 import { registerCreditCardIpc } from "./ipc/credit-card-ipc";
 import { registerDebtIpc } from "./ipc/debt-ipc";
 import { registerFinanceIpc } from "./ipc/finance-ipc";
 import { registerPreferencesIpc } from "./ipc/preferences-ipc";
 import { registerRecurrenceIpc } from "./ipc/recurrence-ipc";
+import { registerReminderIpc } from "./ipc/reminder-ipc";
+import { scheduleReminderChecks } from "./notifications/reminder-scheduler";
 import { createLocalLogger } from "./observability/local-logger";
 
 let mainWindow: BrowserWindow | undefined;
+let isQuitting = false;
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -33,6 +37,11 @@ function createWindow(): void {
   });
 
   mainWindow.once("ready-to-show", () => mainWindow?.show());
+  mainWindow.on("close", (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    mainWindow?.hide();
+  });
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -53,11 +62,28 @@ void app.whenReady().then(async () => {
   const creditCards = createCreditCardRepository(dbClient);
   const debts = createDebtRepository(dbClient);
   const recurrences = createRecurrenceRepository(dbClient);
+  const reminders = createReminderRepository(dbClient);
   registerPreferencesIpc(ipcMain, preferences);
   registerFinanceIpc(ipcMain, finance);
   registerCreditCardIpc(ipcMain, creditCards);
   registerDebtIpc(ipcMain, debts);
   registerRecurrenceIpc(ipcMain, recurrences);
+  registerReminderIpc(ipcMain, reminders);
+  createWindow();
+
+  const activeNotifications = new Set<Notification>();
+  const stopReminders = scheduleReminderChecks(reminders, ({ title, body }) => {
+    if (!Notification.isSupported()) return false;
+    const notification = new Notification({ title, body, urgency: "normal" });
+    activeNotifications.add(notification);
+    notification.on("close", () => activeNotifications.delete(notification));
+    notification.on("click", () => {
+      mainWindow?.show();
+      mainWindow?.focus();
+    });
+    notification.show();
+    return true;
+  });
 
   process.on("uncaughtException", () => {
     logger.unexpected({
@@ -76,13 +102,13 @@ void app.whenReady().then(async () => {
     });
   });
 
-  app.on("before-quit", () => dbClient.close());
+  app.on("before-quit", () => {
+    isQuitting = true;
+    stopReminders();
+    dbClient.close();
+  });
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    else mainWindow?.show();
   });
-  createWindow();
-});
-
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
 });

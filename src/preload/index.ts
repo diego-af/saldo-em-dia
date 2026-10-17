@@ -33,6 +33,11 @@ import {
   recurrenceOccurrenceSchema,
   recurrenceSchema,
 } from "../shared/contracts/recurrence";
+import {
+  type ReminderApi,
+  reminderIpcChannels,
+  reminderKeySchema,
+} from "../shared/contracts/reminder";
 
 const preferences: PreferencesApi = {
   getTheme: async () =>
@@ -132,10 +137,17 @@ const recurrences: RecurrenceApi = {
     ipcRenderer.invoke(recurrenceIpcChannels.confirmOccurrence, input),
 };
 
+const reminders: ReminderApi = {
+  listSilenced: async () =>
+    reminderKeySchema.array().parse(await ipcRenderer.invoke(reminderIpcChannels.listSilenced)),
+  silence: async (key) => ipcRenderer.invoke(reminderIpcChannels.silence, key),
+};
+
 contextBridge.exposeInMainWorld("saldoEmDia", {
   preferences,
   finance,
   creditCards,
   debts,
   recurrences,
+  reminders,
 });
